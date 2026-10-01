@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Yajuu</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background-color: #0b132b;
+      touch-action: manipulation;
+      font-family: -apple-system, sans-serif;
+      color: #fff;
+      user-select: none;
+    }
+    canvas { display: block; }
+
+    .screen {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      background: rgba(11, 19, 43, 0.92);
+      z-index: 10; padding: 20px;
+    }
+    .hidden { display: none !important; }
+
+    h1 { font-size: 26px; margin-bottom: 5px; color: #38bdf8; text-shadow: 0 0 10px #0284c7; }
+    p { margin: 5px 0 15px; color: #cbd5e1; font-size: 14px; }
+
+    .btn {
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      border: none; color: white;
+      padding: 12px 28px; font-size: 16px; font-weight: bold;
+      border-radius: 30px; margin: 6px; cursor: pointer;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+      width: 230px; text-align: center;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-secondary { background: #334155; box-shadow: none; }
+    .btn-gacha { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+
+    .char-grid {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      justify-content: center; max-height: 280px; overflow-y: auto;
+      margin-bottom: 15px; width: 100%; padding: 10px;
+    }
+    .char-card {
+      background: #1e293b; border: 3px solid #334155;
+      border-radius: 14px; padding: 6px; font-size: 28px;
+      width: 80px; height: 85px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      position: relative; cursor: pointer;
+    }
+    .char-card img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+    .char-card.selected { border-color: #38bdf8; box-shadow: 0 0 12px #38bdf8; background: #0f172a; }
+    .char-card.selected::after {
+      content: '✔'; position: absolute; top: -6px; right: -6px;
+      background: #38bdf8; color: #000; font-size: 12px; font-weight: bold;
+      width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .char-card.locked { opacity: 0.25; filter: grayscale(1); cursor: not-allowed; }
+    .char-name { font-size: 10px; margin-top: 4px; color: #94a3b8; text-align: center; white-space: nowrap; }
+
+    .gacha-result { font-size: 60px; margin: 15px 0; animation: pop 0.4s ease-out; display: flex; justify-content: center; align-items: center; height: 70px; }
+    .gacha-result img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; }
+    @keyframes pop { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+    #gameUI { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; pointer-events: none; z-index: 5; }
+    .back-btn { position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px; border-radius: 12px; pointer-events: auto; font-size: 12px; }
+
+    .hold-container {
+      display: flex; gap: 6px; margin-top: 8px; justify-content: center;
+    }
+    .hold-lamp {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #334155; border: 1px solid #94a3b8;
+    }
+    .hold-blue { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+    .hold-green { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .hold-red { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+    .hold-gold { background: #facc15; box-shadow: 0 0 12px #facc15; }
+
+    #pachinkoLCD {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.94);
+      z-index: 30; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; pointer-events: none;
+    }
+    .pachinko-frame {
+      border: 8px solid #f59e0b;
+      box-shadow: 0 0 35px #f59e0b, inset 0 0 20px #000;
+      border-radius: 20px; background: #000;
+      padding: 20px; width: 90%; max-width: 380px;
+      text-align: center; position: relative; overflow: hidden;
+    }
+    .reel-container {
+      display: flex; justify-content: center; gap: 10px; margin: 15px 0;
+    }
+    .reel {
+      background: linear-gradient(180deg, #1e293b, #0f172a);
+      border: 2px solid #cbd5e1; border-radius: 10px;
+      width: 75px; height: 95px; font-size: 55px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      color: #38bdf8; text-shadow: 0 0 10px #0284c7;
+    }
+    .reel.seven { color: #ff4757; text-shadow: 0 0 15px #ff4757; }
+
+    .status-text {
+      font-size: 22px; font-weight: 900; height: 32px;
+      color: #facc15; text-shadow: 0 0 10px #f59e0b;
+    }
+    .reach-text {
+      font-size: 32px; font-weight: 900; color: #ef4444;
+      text-shadow: 0 0 15px #ef4444; animation: blink 0.15s infinite alternate;
+    }
+    .fish-swarm {
+      position: absolute; width: 100%; top: 35%;
+      display: flex; gap: 10px; justify-content: center; align-items: center;
+      white-space: nowrap; animation: moveFish 1.2s linear forwards;
+    }
+    .fish-swarm img { width: 45px; height: 45px; border-radius: 50%; }
+    @keyframes moveFish {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    .fever-text {
+      font-size: 42px; font-weight: 900;
+      background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #8b00ff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: rainbow 0.1s infinite linear;
+    }
+    @keyframes blink { 0% { opacity: 0.2; } 100% { opacity: 1; } }
+    @keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<canvas id="fountainCanvas"></canvas>
+
+<div id="pachinkoLCD" class="hidden">
+  <div class="pachinko-frame">
+    <div id="pachinkoStatus" class="status-text">変動中...</div>
+    <div id="fishSwarm" class="fish-swarm" style="display:none;">
+      <img src="./hikakin.png" onerror="this.style.display='none'">
+      <img src="./seikin.png" onerror="this.style.display='none'">
+      <img src="./takasu.png" onerror="this.style.display='none'">
+      <img src="./hori.png" onerror="this.style.display='none'">
+    </div>
+    <div class="reel-container">
+      <div id="reel1" class="reel">1</div>
+      <div id="reel2" class="reel">2</div>
+      <div id="reel3" class="reel">3</div>
+    </div>
+    <div id="feverTitle" class="fever-text" style="display: none;">FEVER!!</div>
+  </div>
+</div>
+
+<div id="gameUI">
+  <div style="font-weight: bold; font-size: 18px;" id="gameScore">SCORE: 0</div>
+  <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">大当り確率: 1/319</div>
+  <div class="hold-container" id="holdLamps">
+    <div class="hold-lamp"></div>
+    <div class="hold-lamp"></div>
+    <div class="hold-lamp"></div>
+    <div class="hold-lamp"></div>
+  </div>
+  <div style="width: 100%; background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; margin-top: 6px;">
+    <div id="waterBar" style="width: 0%; background: #38bdf8; height: 100%; border-radius: 4px;"></div>
+  </div>
+  <button class="back-btn" onclick="showHome()">メニューへ</button>
+</div>
+
+<div id="homeScreen" class="screen">
+  <h1>⛲ 噴水コレクション</h1>
+  <p id="homeScore">所持スコア: 0 PTS</p>
+  <button class="btn" onclick="startGame()">プレイ開始</button>
+  <button class="btn btn-secondary" onclick="showSelect()">キャラを選ぶ（編成）</button>
+  <button class="btn btn-gacha" onclick="showGacha()">ガチャ (1000pt)</button>
+</div>
+
+<div id="selectScreen" class="screen hidden">
+  <h2>🎯 出すキャラを選ぶ</h2>
+  <p>タップしてセット（複数えらべます）</p>
+  <div id="selectList" class="char-grid"></div>
+  <button class="btn" onclick="showHome()">決定して戻る</button>
+</div>
+
+<div id="gachaScreen" class="screen hidden">
+  <h2>🎁 キャラガチャ</h2>
+  <p id="gachaScore">所持スコア: 0 PTS</p>
+  <div id="gachaDisplay" class="gacha-result">❓</div>
+  <div id="gachaText" style="height: 24px; font-weight: bold; margin-bottom: 10px;"></div>
+  <button class="btn btn-gacha" onclick="drawGacha()">ガチャを引く！</button>
+  <button class="btn btn-secondary" onclick="showHome()">戻る</button>
+</div>
+
+<script>
+  const ALL_CHARACTERS = [
+    { id: 'duck', emoji: '🦆', name: 'あひる', rarity: 'N', weight: 30 },
+    { id: 'frog', emoji: '🐸', name: 'かえる', rarity: 'N', weight: 30 },
+    { id: 'fish', emoji: '🐟', name: 'さかな', rarity: 'N', weight: 20 },
+    { id: 'dolphin', emoji: '🐬', name: 'いるか', rarity: 'R', weight: 10 },
+    { id: 'hikakin', image: './hikakin.png', name: 'ヒカキン', rarity: 'SSR', weight: 3 },
+    { id: 'seikin', image: './seikin.png', name: 'セイキン', rarity: 'SSR', weight: 3 },
+    { id: 'takasu', image: './takasu.png', name: '高須幹弥', rarity: 'SSR', weight: 2 },
+    { id: 'hori', image: './hori.png', name: '堀大輔', rarity: 'SSR', weight: 2 }
+  ];
+
+  const loadedImages = {};
+  ALL_CHARACTERS.forEach(c => {
+    if (c.image) {
+      const img = new Image();
+      img.src = c.image;
+      loadedImages[c.id] = img;
+    }
+  });
+
+  let myCharacters = ['duck'];
+  let selectedCharacters = ['duck'];
+  let totalScore = 0;
+  let isPlaying = false;
+  let isPachinkoActive = false;
+  let holds = [];
+
+  const pachinkoSound = new Audio('./patinko.mp3');
+  pachinkoSound.load();
+
+  function unlockAudio() {
+    pachinkoSound.play().then(() => {
+      pachinkoSound.pause();
+      pachinkoSound.currentTime = 0;
+    }).catch(e => console.log(e));
+  }
+
+  function showHome() {
+    isPlaying = false;
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById('homeScreen').classList.remove('hidden');
+    document.getElementById('homeScore').innerText = `所持スコア: ${totalScore.toLocaleString()} PTS`;
+  }
+
+  function startGame() {
+    unlockAudio();
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    isPlaying = true;
+  }
+
+  function showSelect() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById('selectScreen').classList.remove('hidden');
+    
+    const list = document.getElementById('selectList');
+    list.innerHTML = '';
+    
+    ALL_CHARACTERS.forEach(c => {
+      const isOwned = myCharacters.includes(c.id);
+      const isSelected = selectedCharacters.includes(c.id);
+      
+      const div = document.createElement('div');
+      div.className = `char-card ${isOwned ? '' : 'locked'} ${isSelected ? 'selected' : ''}`;
+      
+      let iconContent = '❓';
+      if (isOwned) {
+        iconContent = c.image ? `<img src="${c.image}" alt="${c.name}">` : `<div>${c.emoji}</div>`;
+      }
+      
+      div.innerHTML = `
+        ${iconContent}
+        <div class="char-name">${isOwned ? c.name : '???'}</div>
+      `;
+      
+      if (isOwned) {
+        div.onclick = () => {
+          if (selectedCharacters.includes(c.id)) {
+            if (selectedCharacters.length > 1) selectedCharacters = selectedCharacters.filter(id => id !== c.id);
+          } else {
+            selectedCharacters.push(c.id);
+          }
+          showSelect();
+        };
+      }
+      list.appendChild(div);
+    });
+  }
+
+  function showGacha() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById('gachaScreen').classList.remove('hidden');
+    document.getElementById('gachaScore').innerText = `所持スコア: ${totalScore.toLocaleString()} PTS`;
+    document.getElementById('gachaDisplay').innerHTML = '❓';
+    document.getElementById('gachaText').innerText = '';
+  }
+
+  function drawGacha() {
+    if (totalScore < 1000) {
+      alert("スコアが足りません！（1,000 PTS必要）");
+      return;
+    }
+    totalScore -= 1000;
+    document.getElementById('gachaScore').innerText = `所持スコア: ${totalScore.toLocaleString()} PTS`;
+
+    const totalWeight = ALL_CHARACTERS.reduce((acc, c) => acc + c.weight, 0);
+    let random = Math.random() * totalWeight;
+    let picked = ALL_CHARACTERS[0];
+
+    for (const c of ALL_CHARACTERS) {
+      if (random < c.weight) {
+        picked = c;
+        break;
+      }
+      random -= c.weight;
+    }
+
+    if (!myCharacters.includes(picked.id)) {
+      myCharacters.push(picked.id);
+      selectedCharacters.push(picked.id);
+    }
+
+    const display = document.getElementById('gachaDisplay');
+    display.innerHTML = picked.image ? `<img src="${picked.image}" alt="${picked.name}">` : picked.emoji;
+    document.getElementById('gachaText').innerText = `[${picked.rarity}] ${picked.name} をゲット！`;
+  }
+
+  function updateHoldUI() {
+    const lamps = document.querySelectorAll('#holdLamps .hold-lamp');
+    lamps.forEach((lamp, idx) => {
+      lamp.className = 'hold-lamp';
+      if (holds[idx]) lamp.classList.add(`hold-${holds[idx].color}`);
+    });
+  }
+
+  function addHold() {
+    if (holds.length >= 4) return;
+    
+    const isWin = Math.random() < (1 / 319);
+    let color = isWin ? (Math.random() < 0.6 ? 'gold' : 'red') : (Math.random() < 0.05 ? 'red' : Math.random() < 0.2 ? 'green' : 'blue');
+
+    holds.push({ isWin, color });
+    updateHoldUI();
+
+    if (!isPachinkoActive) consumeHold();
+  }
+
+  function consumeHold() {
+    if (holds.length === 0 || isPachinkoActive) return;
+
+    isPachinkoActive = true;
+    const currentHold = holds.shift();
+    updateHoldUI();
+
+    const isReach = currentHold.isWin || Math.random() < 0.15;
+    const isFishSwarm = currentHold.isWin ? Math.random() < 0.7 : Math.random() < 0.08;
+
+    const lcd = document.getElementById('pachinkoLCD');
+    const reel1 = document.getElementById('reel1');
+    const reel2 = document.getElementById('reel2');
+    const reel3 = document.getElementById('reel3');
+    const status = document.getElementById('pachinkoStatus');
+    const feverText = document.getElementById('feverTitle');
+    const fish = document.getElementById('fishSwarm');
+
+    lcd.classList.remove('hidden');
+    feverText.style.display = 'none';
+    fish.style.display = 'none';
+
+    status.className = 'status-text';
+    status.innerText = currentHold.color === 'gold' ? '👑 金 保 留 激 熱 👑' : '変動中...';
+
+    let shuffleTimer = setInterval(() => {
+      reel1.innerText = Math.floor(Math.random() * 8) + 1;
+      reel2.innerText = Math.floor(Math.random() * 8) + 1;
+      reel3.innerText = Math.floor(Math.random() * 8) + 1;
+      reel1.classList.remove('seven'); reel2.classList.remove('seven'); reel3.classList.remove('seven');
+    }, 40);
+
+    setTimeout(() => {
+      reel1.innerText = '7';
+      reel1.classList.add('seven');
+    }, 800);
+
+    setTimeout(() => {
+      if (isReach) {
+        reel3.innerText = '7';
+        reel3.classList.add('seven');
+        status.className = 'reach-text';
+        status.innerText = 'REACH';
+        if (isFishSwarm) fish.style.display = 'flex';
+      } else {
+        reel3.innerText = '4';
+        clearInterval(shuffleTimer);
+        setTimeout(() => {
+          lcd.classList.add('hidden');
+          isPachinkoActive = false;
+          consumeHold();
+        }, 500);
+      }
+    }, 1600);
+
+    if (isReach) {
+      setTimeout(() => {
+        clearInterval(shuffleTimer);
+        let step = 0;
+        let slowTimer = setInterval(() => {
+          step++;
+          reel2.innerText = Math.floor(Math.random() * 8) + 1;
+
+          if (step > 12) {
+            clearInterval(slowTimer);
+
+            if (currentHold.isWin) {
+              reel2.innerText = '7';
+              reel2.classList.add('seven');
+              feverText.style.display = 'block';
+              status.innerText = '超 確 変 大 当 り !!';
+
+              pachinkoSound.pause();
+              pachinkoSound.currentTime = 0;
+              pachinkoSound.play().catch(e => console.log(e));
+
+              setTimeout(() => {
+                lcd.classList.add('hidden');
+                isPachinkoActive = false;
+                spawnFountain(canvas.width / 2, canvas.height * 0.82, true, true);
+                for(let k = 0; k < 15; k++) {
+                  const randomCharId = selectedCharacters[Math.floor(Math.random() * selectedCharacters.length)];
+                  const charObj = ALL_CHARACTERS.find(c => c.id === randomCharId);
+                  if (charObj) charParticles.push(new CharParticle(canvas.width / 2, canvas.height * 0.82, charObj));
+                }
+                totalScore += 10000;
+                consumeHold();
+              }, 3000);
+
+            } else {
+              reel2.innerText = '6';
+              status.innerText = 'ハズレ';
+              setTimeout(() => {
+                lcd.classList.add('hidden');
+                isPachinkoActive = false;
+                consumeHold();
+              }, 1000);
+            }
+          }
+        }, 200);
+      }, 2600);
+    }
+  }
+
+  const canvas = document.getElementById('fountainCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  let particles = [];
+  let charParticles = [];
+  let waterLevel = 0;
+  const maxWaterLevel = 100;
+
+  const MAX_PARTICLES = 180;
+  const MAX_CHAR_PARTICLES = 15;
+
+  class Particle {
+    constructor(x, y, isPowerUp, isMega = false) {
+      this.x = x; this.y = y;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * (isMega ? 1.2 : 0.4);
+      const speed = Math.random() * (isMega ? 18 : (isPowerUp ? 12 : 7)) + 2;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.radius = Math.random() * 2.5 + 1.2;
+      const hue = isMega ? Math.random() * 360 : 195;
+      this.color = `hsl(${hue}, 95%, ${65 + Math.random() * 25}%)`;
+      this.life = 50 + Math.random() * 20;
+      this.opacity = 1;
+      this.gravity = 0.25;
+    }
+    update() {
+      this.vx *= 0.98; this.vy += this.gravity;
+      this.x += this.vx; this.y += this.vy;
+      this.life -= 1;
+      this.opacity = Math.max(0, this.life / 50);
+    }
+    draw() {
+      if (this.opacity <= 0) return;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.globalAlpha = this.opacity;
+      ctx.fill();
+    }
+  }
+
+  class CharParticle {
+    constructor(x, y, charObj) {
+      this.x = x; this.y = y;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+      const speed = Math.random() * 12 + 5;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.charObj = charObj;
+      this.life = 60;
+      this.gravity = 0.28;
+      this.size = 32 + Math.random() * 8;
+    }
+    update() {
+      this.vy += this.gravity;
+      this.x += this.vx; this.y += this.vy;
+      this.life -= 1;
+    }
+    draw() {
+      ctx.globalAlpha = Math.max(0, this.life / 60);
+      const img = loadedImages[this.charObj.id];
+      if (this.charObj.image && img && img.complete && img.naturalWidth !== 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+        ctx.restore();
+      } else {
+        ctx.font = `${this.size}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(this.charObj.emoji || '❓', this.x, this.y);
+      }
+    }
+  }
+
+  function spawnFountain(x, y, isPowerUp = false, isMega = false) {
+    const count = isMega ? 50 : (isPowerUp ? 10 : 3);
+    
+    if (particles.length + count > MAX_PARTICLES) {
+      particles.splice(0, count);
+    }
+
+    for (let i = 0; i < count; i++) {
+      particles.push(new Particle(x, y, isPowerUp, isMega));
+    }
+
+    if (isPowerUp && Math.random() < 0.35 && selectedCharacters.length > 0) {
+      if (charParticles.length >= MAX_CHAR_PARTICLES) {
+        charParticles.shift();
+      }
+      const randomCharId = selectedCharacters[Math.floor(Math.random() * selectedCharacters.length)];
+      const charObj = ALL_CHARACTERS.find(c => c.id === randomCharId);
+      if (charObj) charParticles.push(new CharParticle(x, y, charObj));
+    }
+
+    if (isPlaying && !isMega) {
+      waterLevel += isPowerUp ? 2.5 : 0.3;
+      if (waterLevel >= maxWaterLevel) {
+        waterLevel = 0;
+        spawnFountain(canvas.width / 2, canvas.height * 0.82, false, true);
+        totalScore += Math.floor(Math.random() * 200) + 100;
+        addHold();
+      }
+    }
+  }
+
+  setInterval(() => {
+    spawnFountain(canvas.width / 2, canvas.height * 0.82, false);
+  }, 130);
+
+  let lastTapTime = 0;
+  function handleTap() {
+    if (!isPlaying || isPachinkoActive) return;
+    const now = Date.now();
+    if (now - lastTapTime < 35) return;
+    lastTapTime = now;
+
+    spawnFountain(canvas.width / 2, canvas.height * 0.82, true);
+    totalScore += 10;
+  }
+
+  window.addEventListener('touchstart', (e) => {
+    handleTap();
+  }, { passive: true });
+
+  window.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    handleTap();
+  });
+
+  function animate() {
+    ctx.fillStyle = '#0b132b';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (isPlaying) {
+      const waterH = (waterLevel / maxWaterLevel) * (canvas.height * 0.18);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.fillRect(0, canvas.height - waterH, canvas.width, waterH);
+    }
+
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height * 0.82, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fill();
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      particles[i].draw();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    for (let i = charParticles.length - 1; i >= 0; i--) {
+      charParticles[i].update();
+      charParticles[i].draw();
+      if (charParticles[i].life <= 0) charParticles.splice(i, 1);
+    }
+
+    ctx.globalAlpha = 1.0;
+
+    if (isPlaying) {
+      document.getElementById('gameScore').innerText = `SCORE: ${totalScore.toLocaleString()}`;
+      document.getElementById('waterBar').style.width = `${waterLevel}%`;
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  showHome();
+  animate();
+</script>
+</body>
+</html>
